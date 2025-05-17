@@ -1,0 +1,40 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "ts-node src/app.ts",
+    "start:dev": "nodemon --watch src --ext ts,js,json --exec ts-node src/app.ts",
+    "start:pretty": "ts-node src/app.ts | npx pino-pretty",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "typeorm": "ts-node --transpile-only ./node_modules/typeorm/cli.js",
+    "migration:run": "ts-node --transpile-only ./node_modules/typeorm/cli.js migration:run -d ./src/data-source.ts",
+    "migration:generate": "ts-node --transpile-only ./node_modules/typeorm/cli.js migration:generate -d ./src/data-source.ts",
+    "migration:create": "ts-node --transpile-only ./node_modules/typeorm/cli.js migration:create -d ./src/data-source.ts",
+    "migration:gen": "ts-node --transpile-only ./node_modules/typeorm/cli.js migration:generate -d ./src/data-source.ts ./src/migrations/$npm_config_name",
+    "seed": "ts-node src/seeds/index.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.2",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mysql2": "^3.14.1",
+    "typeorm": "^0.3.24"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^5.0.2",
+    "@types/express": "^5.0.1",
+    "@types/jsonwebtoken": "^9.0.9",
+    "@types/node": "^22.15.18",
+    "nodemon": "^3.1.10",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
+  }
+}
