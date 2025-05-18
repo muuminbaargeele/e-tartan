@@ -40,8 +40,11 @@ export class User {
     @Column({ default: true })
     isActive!: boolean;
 
+    @Column({ default: false })
+    hasCompleteProfile!: boolean;
+
     @ManyToOne(() => Role)
-    @JoinColumn({ name: "roleId" })
+    @JoinColumn({ name: "roleId", })
     role: Role;
 
     @CreateDateColumn()

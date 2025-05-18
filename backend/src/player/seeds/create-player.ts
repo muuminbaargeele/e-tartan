@@ -1,8 +1,8 @@
-import AppDataSource from "../data-source";
-import { User } from "../user/entities/user.entity";
-import { Role } from "../user/entities/role.entity"; // <-- fixed import
-import { Player } from "../player/entities/player.entity";
-import { hashPassword } from "../utils/password";
+import AppDataSource from "../../data-source";
+import { User } from "../../user/entities/user.entity";
+import { Role } from "../../user/entities/role.entity"; // <-- fixed import
+import { Player } from "../../player/entities/player.entity";
+import { hashPassword } from "../../utils/password";
 
 export async function seedPlayer() {
   const userRepo = AppDataSource.getRepository(User);
@@ -37,7 +37,8 @@ export async function seedPlayer() {
     firstName: "Player",
     middleName: null,
     lastName: "One",
-    email: "player1@example.com"
+    email: "player1@example.com",
+    hasCompleteProfile: true
   });
   await userRepo.save(user);
 

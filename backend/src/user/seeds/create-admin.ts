@@ -1,7 +1,7 @@
-import AppDataSource from "../data-source";
-import { User } from "../user/entities/user.entity";
-import { Role } from "../user/entities/role.entity"; // <-- fixed import
-import { hashPassword } from "../utils/password";
+import AppDataSource from "../../data-source";
+import { User } from "../entities/user.entity";
+import { Role } from "../entities/role.entity"; // <-- fixed import
+import { hashPassword } from "../../utils/password";
 
 export async function seedAdmin() {
   const userRepo = AppDataSource.getRepository(User);

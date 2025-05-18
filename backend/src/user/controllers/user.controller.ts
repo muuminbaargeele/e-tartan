@@ -4,6 +4,10 @@ import { UserService } from "../services/user.service";
 import { success, error } from "../../utils/apiResponse";
 import { HttpStatus } from "../../utils/enums";
 import { UserProfileDto } from "../dtoes/userProfile.dto";
+import { CreateUserDto } from "../dtoes/createUser.dto";
+import { validateDto } from "../../utils/validateDto";
+import { SysConfig } from "../../utils/entities/sysconfig.entity";
+import AppDataSource from "../../data-source";
 
 const router = Router();
 const userService = new UserService();
@@ -29,5 +33,37 @@ router.get("/profile", authMiddleware as any, async (req: Request, res: Response
         return;
     }
 });
+
+router.post(
+  "/create",
+  validateDto(CreateUserDto),
+  async (req: Request, res: Response) => {
+    try {
+      const dto: CreateUserDto = (req as any).validatedBody;
+      const user = await userService.createUser(dto);
+
+      const sysConfigRepo = AppDataSource.getRepository(SysConfig);
+      const smsOtp = await sysConfigRepo.findOneBy({ key: "isSmsOtpActive" });
+      const emailOtp = await sysConfigRepo.findOneBy({ key: "isEmailOtpActive" });
+
+      let otpType: string | null = null;
+      if (smsOtp?.value === "true") {
+        otpType = "sms";
+      } else if (emailOtp?.value === "true") {
+        otpType = "email";
+      }
+
+      res.status(HttpStatus.OK).json(
+        success({ userId: user.id, username: user.username, otpType })
+      );
+      return;
+    } catch (err: any) {
+      res.status(HttpStatus.BAD_REQUEST).json(
+        error(err.message, HttpStatus.BAD_REQUEST)
+      );
+      return;
+    }
+  }
+);
 
 export default router;

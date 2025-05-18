@@ -17,3 +17,14 @@ export enum UserRole {
   // Extend as needed
 }
 
+export enum OtpPurpose {
+  REGISTER = "register",
+  LOGIN = "login",
+  RESET_PASSWORD = "reset_password",
+  OTHER = "other"
+}
+
+export enum OtpType {
+  SMS = "sms",
+  EMAIL = "email",
+}

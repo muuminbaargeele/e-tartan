@@ -8,5 +8,6 @@ export class UserProfileDto {
   lastName: string;
   email: string;
   role: string;
+  hasCompleteProfile: boolean;
   playerProfile?: PlayerProfileDto;
 }

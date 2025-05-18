@@ -1,5 +1,5 @@
-import AppDataSource from "../data-source";
-import { Role } from "../user/entities/role.entity"; // <-- fixed import
+import AppDataSource from "../../data-source";
+import { Role } from "../entities/role.entity";
 
 export async function seedRoles() {
   const roleRepo = AppDataSource.getRepository(Role);
