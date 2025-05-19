@@ -7,6 +7,8 @@ import { CreateUserDto } from "../dtoes/createUser.dto";
 import { Role } from "../entities/role.entity";
 import { AuthService } from "../../auth/services/auth.service";
 
+const authService = new AuthService();
+
 export class UserService {
     async getProfile(dbuser: User): Promise<UserProfileDto> {
         const userRepo = AppDataSource.getRepository(User);
@@ -50,7 +52,7 @@ export class UserService {
         return profile;
     }
 
-    async createUser(dto: CreateUserDto): Promise<User> {
+    async createUser(dto: CreateUserDto): Promise<{ user: User, otpType: string }> {
         const userRepo = AppDataSource.getRepository(User);
         const roleRepo = AppDataSource.getRepository(Role);
 
@@ -85,12 +87,20 @@ export class UserService {
             tokenVersion: 0,
         });
 
-        const authService = new AuthService(); // or inject
-        await authService.sendOtp(
-            user
-        );
+        // Save the user in DB
+        const savedUser = await userRepo.save(user);
 
-        return await userRepo.save(user);
+        // Try to send OTP, if fails, delete user
+        let otpResult: any;
+        try {
+            otpResult = await authService.sendOtp(savedUser);
+        } catch (err) {
+            await userRepo.delete(savedUser.id);  // Clean up
+            throw new Error("Failed to send OTP."); // or err.message if you want details
+        }
+
+        // otpResult.otpType should be "sms" or "email"
+        return { user: savedUser, otpType: otpResult.otpType };
     }
 
 }

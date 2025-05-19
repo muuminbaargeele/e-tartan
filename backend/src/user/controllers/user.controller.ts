@@ -40,18 +40,11 @@ router.post(
   async (req: Request, res: Response) => {
     try {
       const dto: CreateUserDto = (req as any).validatedBody;
-      const user = await userService.createUser(dto);
+      const { user, otpType } = await userService.createUser(dto);
 
       const sysConfigRepo = AppDataSource.getRepository(SysConfig);
       const smsOtp = await sysConfigRepo.findOneBy({ key: "isSmsOtpActive" });
       const emailOtp = await sysConfigRepo.findOneBy({ key: "isEmailOtpActive" });
-
-      let otpType: string | null = null;
-      if (smsOtp?.value === "true") {
-        otpType = "sms";
-      } else if (emailOtp?.value === "true") {
-        otpType = "email";
-      }
 
       res.status(HttpStatus.OK).json(
         success({ userId: user.id, username: user.username, otpType })

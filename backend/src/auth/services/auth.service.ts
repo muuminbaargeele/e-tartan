@@ -6,7 +6,8 @@ import { LoginRespDto } from "../dtoes/login.dto";
 import { Otp } from "../../user/entities/otp.entity";
 import { OtpType } from "../../utils/enums";
 import { SysConfig } from "../../utils/entities/sysconfig.entity";
-import { sendOtpEmail } from "../../utils/sendEmailOtp";
+import { sendOtpEmail } from "../../utils/otp/sendEmailOtp";
+import { sendSmsOtp } from "../../utils/otp/sendSmsOtp";
 
 export class AuthService {
   private userRepo = AppDataSource.getRepository(User);
@@ -57,7 +58,7 @@ export class AuthService {
     const sysConfigRepo = AppDataSource.getRepository(SysConfig);
     const otpRepo = AppDataSource.getRepository(Otp);
 
- 
+
     const smsActive = await sysConfigRepo.findOneBy({ key: "isSmsOtpActive" });
     const emailActive = await sysConfigRepo.findOneBy({ key: "isEmailOtpActive" });
 
@@ -89,17 +90,44 @@ export class AuthService {
     });
     await otpRepo.save(otp);
 
-    if (otpType === OtpType.EMAIL) {
+    // Give priority to SMS: if both are active and phone is present, use SMS
+    if (otpType === OtpType.SMS) {
       try {
-        await sendOtpEmail(destination, code);
+        const smsNumber = destination.startsWith("252") ? destination.substring(3) : destination;
+        await sendSmsOtp(smsNumber, code);
+      } catch (err) {
+        console.error("Failed to send OTP SMS:", err?.response?.data || err?.message || err);
+
+        // Attempt email fallback
+        if (emailActive?.value === "true" && email) {
+          try {
+            await sendOtpEmail(email, code, user);
+            // update the OTP entry to reflect that it's for EMAIL now
+            otp.destination = email;
+            otp.type = OtpType.EMAIL;
+            await otpRepo.save(otp);
+            return { destination: email, otpType: OtpType.EMAIL, code }; // For Dev
+          } catch (emailErr) {
+            otp.isUsed = true;
+            await otpRepo.save(otp);
+            throw new Error("Failed to send OTP SMS and fallback Email.");
+          }
+        } else {
+          otp.isUsed = true;
+          await otpRepo.save(otp);
+          throw new Error("Failed to send OTP SMS.");
+        }
+      }
+    } else if (otpType === OtpType.EMAIL) {
+      try {
+        await sendOtpEmail(destination, code, user);
       } catch (err) {
         otp.isUsed = true;
         await otpRepo.save(otp);
-        throw new Error("Failed to send OTP email.");
+        throw new Error("Failed to send OTP Email.");
       }
     }
-    // (For SMS: add SMS sending logic here in the future)
-    
+
     return { destination, otpType, code }; // For Dev
     // return { destination, otpType };
   }
