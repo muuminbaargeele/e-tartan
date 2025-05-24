@@ -6,6 +6,7 @@ import { TournamentService } from "../services/tournament.service";
 import { success, error } from "../../utils/apiResponse";
 import { HttpStatus } from "../../utils/enums";
 import { UpdateTournamentDto } from "../dtoes/updateTournament.dto";
+import { playerAuthMiddleware } from "../../auth/middleware/playerAuth.middleware";
 
 const router = Router();
 const tournamentService = new TournamentService();
@@ -101,6 +102,85 @@ router.delete(
       }
       res.status(HttpStatus.OK).json(success({ message: "Tournament deleted." }));
     } catch (err) {
+      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json(error("Server error", HttpStatus.INTERNAL_SERVER_ERROR));
+    }
+  }
+);
+
+router.post(
+  "/:id/register",
+  playerAuthMiddleware as any,
+  async (req: Request, res: Response) => {
+    try {
+      const tournamentId = Number(req.params.id);
+      if (isNaN(tournamentId)) {
+        res.status(HttpStatus.BAD_REQUEST).json(error("Invalid tournament ID", HttpStatus.BAD_REQUEST));
+        return;
+      }
+      const player = (req as any).user; // Make sure your auth attaches the player info here
+      const { subscriptionTypeId, promoCode } = req.body || {};
+
+      const playerId = player.player?.id;
+      if (!playerId) {
+        res.status(HttpStatus.BAD_REQUEST).json(error("No player ID found on user", HttpStatus.BAD_REQUEST));
+        return;
+      }
+      const result = await tournamentService.registerPlayerForTournament(
+        tournamentId,
+        playerId, // or player.id, depending on your user structure
+        subscriptionTypeId,
+        promoCode
+      );
+      res.status(HttpStatus.OK).json(success(result));
+    } catch (err: any) {
+      res.status(HttpStatus.BAD_REQUEST).json(error(err.message, HttpStatus.BAD_REQUEST));
+    }
+  }
+);
+
+router.get(
+  "/:id/participants",
+  playerAuthMiddleware as any, 
+  async (req: Request, res: Response) => {
+    try {
+      const tournamentId = Number(req.params.id);
+      if (isNaN(tournamentId)) {
+        res.status(HttpStatus.BAD_REQUEST).json(error("Invalid tournament ID", HttpStatus.BAD_REQUEST));
+        return;
+      }
+      const user = (req as any).user;
+      if (user.role && user.role.name === "admin") {
+        const participants = await tournamentService.getParticipantsForTournament(tournamentId);
+        res.status(HttpStatus.OK).json(success(participants));
+      } else {
+        const participants = await tournamentService.getPublicParticipantsForTournament(tournamentId);
+        res.status(HttpStatus.OK).json(success(participants));
+      }
+    } catch (err: any) {
+      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json(error("Server error", HttpStatus.INTERNAL_SERVER_ERROR));
+    }
+  }
+);
+
+router.get(
+  "/:id/is-registered",
+  playerAuthMiddleware as any,
+  async (req: Request, res: Response) => {
+    try {
+      const tournamentId = Number(req.params.id);
+      if (isNaN(tournamentId)) {
+        res.status(HttpStatus.BAD_REQUEST).json(error("Invalid tournament ID", HttpStatus.BAD_REQUEST));
+        return;
+      }
+      const player = (req as any).user;
+      const playerId = player.player?.id;
+      if (!playerId) {
+        res.status(HttpStatus.BAD_REQUEST).json(error("No player ID found on user", HttpStatus.BAD_REQUEST));
+        return;
+      }
+      const joined = await tournamentService.isPlayerRegisteredForTournament(tournamentId, playerId);
+      res.status(HttpStatus.OK).json(success({ joined }));
+    } catch (err: any) {
       res.status(HttpStatus.INTERNAL_SERVER_ERROR).json(error("Server error", HttpStatus.INTERNAL_SERVER_ERROR));
     }
   }

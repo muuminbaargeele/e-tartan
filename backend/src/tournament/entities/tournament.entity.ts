@@ -2,6 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateCol
 import { User } from "../../user/entities/user.entity";
 import { TournamentStatus } from "./tournamentStatus.entity";
 import { TournamentType } from "./tournamentType.entity";
+import { SubscriptionType } from "../../subscription/entities/subscriptionType.entity";
 
 @Entity()
 export class Tournament {
@@ -12,10 +13,18 @@ export class Tournament {
   name: string;
 
   @ManyToOne(() => TournamentType)
+  @JoinColumn({ name: "typeId" })
   type: TournamentType;
 
+  @Column()
+  typeId: number;
+
   @ManyToOne(() => TournamentStatus)
+  @JoinColumn({ name: "statusId" })
   status: TournamentStatus;
+
+  @Column()
+  statusId: number;
 
   @Column({ type: "timestamp" })
   startDate: Date;
@@ -29,6 +38,9 @@ export class Tournament {
   @Column({ type: "boolean", default: false })
   isAuto: boolean;
 
+  @Column({ type: "decimal", precision: 10, scale: 2, default: 0 })
+  price: number;
+
   @CreateDateColumn()
   createdAt: Date;
 
@@ -36,6 +48,17 @@ export class Tournament {
   updatedAt: Date;
 
   @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: "createdById" })
   createdBy?: User;
+
+  @Column({ nullable: true })
+  createdById?: number;
+
+  @ManyToOne(() => SubscriptionType, { nullable: true })
+  @JoinColumn({ name: "subscriptionTypeId" })
+  subscriptionType?: SubscriptionType;
+
+  @Column({ nullable: true })
+  subscriptionTypeId?: number;
 
 }

@@ -1,17 +1,15 @@
-import { IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, IsBoolean, IsDateString, Min, isString } from "class-validator";
+import { IsInt, IsNotEmpty, IsOptional, IsString, IsBoolean, IsDateString, Min, IsNumber } from "class-validator";
 
 export class CreateTournamentDto {
   @IsString()
   @IsNotEmpty()
   name: string;
 
-  @IsOptional()
-  @IsString()
-  typeId?: number;
+  @IsInt()
+  typeId: number;
 
-  @IsOptional()
-  @IsString()
-  statusId?: number;
+  @IsInt()
+  statusId: number;
 
   @IsDateString()
   startDate: string;
@@ -30,6 +28,18 @@ export class CreateTournamentDto {
   isAuto?: boolean;
 
   @IsOptional()
+  @IsInt()
+  createdById?: number;
+
+  @IsOptional()
+  @IsNumber()
+  price?: number;
+
+  @IsOptional()
+  @IsInt()
+  subscriptionTypeId?: number;
+
+  @IsOptional()
   @IsString()
-  createdBy?: string
+  promoCode?: string;
 }
