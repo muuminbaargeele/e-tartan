@@ -6,6 +6,7 @@ dotenv.config();
 
 import authRouter from "./auth/controllers/auth.controller";
 import userRouter from "./user/controllers/user.controller";
+import tournamentRouter from "./tournament/controllers/tournament.controller";
 
 const app = express();
 
@@ -13,6 +14,7 @@ app.use(express.json());
 
 app.use("/auth", authRouter);
 app.use("/user", userRouter);
+app.use("/tournament", tournamentRouter);
 
 app.get("/healthy", (req, res) => {
   res.json({ status: "ok", message: "Server is healthy!" });

@@ -18,13 +18,22 @@ export class UserService {
             relations: { role: true, player: true }
         });
 
-        let hasCompleteProfile: boolean =
+        if (!user || user.isDeleted) {
+            throw new Error("User not found");
+        }
+
+        let calculatedCompleteProfile =
             !!(user.firstName && user.lastName && user.email);
 
         if (user.role?.name === "player") {
-            hasCompleteProfile =
-                hasCompleteProfile &&
+            calculatedCompleteProfile =
+                calculatedCompleteProfile &&
                 !!(user.player?.efootballId && user.player?.efootballUsername);
+        }
+
+        if (user.hasCompleteProfile !== calculatedCompleteProfile) {
+            user.hasCompleteProfile = calculatedCompleteProfile;
+            await userRepo.save(user);
         }
 
 
@@ -37,7 +46,7 @@ export class UserService {
             lastName: user.lastName,
             email: user.email,
             role: user.role?.name,
-            hasCompleteProfile: hasCompleteProfile
+            hasCompleteProfile: calculatedCompleteProfile
         };
 
         if (user.role?.name === "player" && user.player) {
@@ -56,28 +65,30 @@ export class UserService {
         const userRepo = AppDataSource.getRepository(User);
         const roleRepo = AppDataSource.getRepository(Role);
 
-        // Check for existing username/email/phone
-        if (await userRepo.findOneBy({ username: dto.username })) {
+        const existingUsernameUser = await userRepo.findOneBy({ username: dto.username });
+        if (existingUsernameUser) {
             throw new Error("Username already exists");
         }
-        if (await userRepo.findOneBy({ email: dto.email })) {
+        const existingEmailUser = await userRepo.findOneBy({ email: dto.email });
+        if (existingEmailUser) {
             throw new Error("Email already exists");
         }
-        if (await userRepo.findOneBy({ phoneNumber: dto.phoneNumber })) {
+        const existingPhoneUser = await userRepo.findOneBy({ phoneNumber: dto.phoneNumber });
+        if (existingPhoneUser) {
             throw new Error("Phone number already exists");
         }
 
-        // Assign role (use dto.role if provided, else default to 'player')
         let roleName = dto.role ? dto.role : "player";
         let role = await roleRepo.findOneBy({ name: roleName });
         if (!role) throw new Error(`${roleName.charAt(0).toUpperCase() + roleName.slice(1)} role not found`);
 
         let username = dto.username;
+        let hasCompleteProfile = true
         if (role.name === "player") {
             username = dto.phoneNumber;
+            hasCompleteProfile = false
         }
 
-        // Create user
         const user = userRepo.create({
             ...dto,
             username,
@@ -85,12 +96,11 @@ export class UserService {
             role,
             isActive: true,
             tokenVersion: 0,
+            hasCompleteProfile: hasCompleteProfile
         });
 
-        // Save the user in DB
         const savedUser = await userRepo.save(user);
 
-        // Try to send OTP, if fails, delete user
         let otpResult: any;
         try {
             otpResult = await authService.sendOtp(savedUser);
@@ -99,8 +109,14 @@ export class UserService {
             throw new Error("Failed to send OTP."); // or err.message if you want details
         }
 
-        // otpResult.otpType should be "sms" or "email"
         return { user: savedUser, otpType: otpResult.otpType };
+    };
+
+    async deleteAccount(user: User): Promise<void> {
+        const userRepo = AppDataSource.getRepository(User);
+        user.isDeleted = true;
+        user.tokenVersion = 0;
+        await userRepo.save(user);
     }
 
 }

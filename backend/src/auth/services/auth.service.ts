@@ -1,6 +1,6 @@
 import { User } from "../../user/entities/user.entity";
 import AppDataSource from "../../data-source";
-import { verifyPassword } from "../../utils/password";
+import { hashPassword, verifyPassword } from "../../utils/password";
 import { signToken } from "../../utils/token";
 import { LoginRespDto } from "../dtoes/login.dto";
 import { Otp } from "../../user/entities/otp.entity";
@@ -8,13 +8,14 @@ import { OtpType } from "../../utils/enums";
 import { SysConfig } from "../../utils/entities/sysconfig.entity";
 import { sendOtpEmail } from "../../utils/otp/sendEmailOtp";
 import { sendSmsOtp } from "../../utils/otp/sendSmsOtp";
+import { MoreThan, In } from "typeorm";
 
 export class AuthService {
   private userRepo = AppDataSource.getRepository(User);
 
   async login(username: string, password: string): Promise<LoginRespDto | null> {
     const user = await this.userRepo.findOneBy({ username });
-    if (!user) return null;
+    if (!user || user.isDeleted) return null;
     const isValid = await verifyPassword(password, user.passwordHash);
     if (!isValid) return null;
 
@@ -31,52 +32,61 @@ export class AuthService {
 
   async verifyOtp(user: User, code: string): Promise<boolean> {
     const otpRepo = AppDataSource.getRepository(Otp);
+    const destinations = [user.phoneNumber, user.email].filter(Boolean);
 
-    const possibleDestinations = [user.phoneNumber, user.email].filter(Boolean);
-
-    // Find the most recent unused OTP matching the code and one of the user's destinations
+    // Find the most recent unused OTP matching the code and user's phone/email
     const otp = await otpRepo.findOne({
       where: {
         code,
-        destination: possibleDestinations.length === 1 ? possibleDestinations[0] : undefined,
+        destination: destinations.length > 1 ? In(destinations) : destinations[0],
         isUsed: false,
+        expiresAt: MoreThan(new Date())
       },
       order: { createdAt: "DESC" }
     });
 
     if (!otp) return false;
 
-    if (otp.expiresAt && new Date() > otp.expiresAt) return false;
-
     otp.isUsed = true;
     await otpRepo.save(otp);
-
     return true;
   }
 
-  async sendOtp(user?: User): Promise<{ destination: string, otpType: string, code?: string }> {
+  async sendOtp(user?: User, context: string = "default"): Promise<{ destination: string, otpType: string, code?: string }> {
     const sysConfigRepo = AppDataSource.getRepository(SysConfig);
     const otpRepo = AppDataSource.getRepository(Otp);
-
 
     const smsActive = await sysConfigRepo.findOneBy({ key: "isSmsOtpActive" });
     const emailActive = await sysConfigRepo.findOneBy({ key: "isEmailOtpActive" });
 
-
-    const phoneNumber = user?.phoneNumber
-    const email = user?.email
+    const phoneNumber = user?.phoneNumber;
+    const email = user?.email;
 
     let otpType: OtpType | null = null;
     let destination: string | undefined = undefined;
 
-    if (smsActive?.value === "true" && phoneNumber) {
-      otpType = OtpType.SMS;
-      destination = phoneNumber;
-    } else if (emailActive?.value === "true" && email) {
-      otpType = OtpType.EMAIL;
-      destination = email;
+    if (context === "resetPassword" && user) {
+      if (user.verifiedViaEmail && emailActive?.value === "true" && email) {
+        otpType = OtpType.EMAIL;
+        destination = email;
+      } else if (!user.verifiedViaEmail && user.verifiedViaSms && smsActive?.value === "true" && phoneNumber) {
+        otpType = OtpType.SMS;
+        destination = phoneNumber;
+        user.forceVerifyViaEmail = true;
+        await this.userRepo.save(user);
+      } else {
+        throw new Error("No verified channel for password reset.");
+      }
     } else {
-      throw new Error("No active OTP method or valid destination provided.");
+      if (smsActive?.value === "true" && phoneNumber) {
+        otpType = OtpType.SMS;
+        destination = phoneNumber;
+      } else if (emailActive?.value === "true" && email) {
+        otpType = OtpType.EMAIL;
+        destination = email;
+      } else {
+        throw new Error("No active OTP method or valid destination provided.");
+      }
     }
 
     const code = Math.floor(100000 + Math.random() * 900000).toString();
@@ -90,7 +100,6 @@ export class AuthService {
     });
     await otpRepo.save(otp);
 
-    // Give priority to SMS: if both are active and phone is present, use SMS
     if (otpType === OtpType.SMS) {
       try {
         const smsNumber = destination.startsWith("252") ? destination.substring(3) : destination;
@@ -98,15 +107,13 @@ export class AuthService {
       } catch (err) {
         console.error("Failed to send OTP SMS:", err?.response?.data || err?.message || err);
 
-        // Attempt email fallback
         if (emailActive?.value === "true" && email) {
           try {
             await sendOtpEmail(email, code, user);
-            // update the OTP entry to reflect that it's for EMAIL now
             otp.destination = email;
             otp.type = OtpType.EMAIL;
             await otpRepo.save(otp);
-            return { destination: email, otpType: OtpType.EMAIL, code }; // For Dev
+            return { destination: email, otpType: OtpType.EMAIL, code };
           } catch (emailErr) {
             otp.isUsed = true;
             await otpRepo.save(otp);
@@ -128,8 +135,51 @@ export class AuthService {
       }
     }
 
-    return { destination, otpType, code }; // For Dev
-    // return { destination, otpType };
-  }
+    if (process.env.NODE_ENV === "production") {
+      return { destination, otpType };
+    }
 
+    return { destination, otpType, code }; // Include code for dev/testing
+  };
+
+  async confirmResetPassword(user: User, code: string, newPassword: string): Promise<void> {
+    const otpRepo = AppDataSource.getRepository(Otp);
+    const userRepo = AppDataSource.getRepository(User);
+
+    const destinations = [user.phoneNumber, user.email].filter(Boolean);
+
+    const existingOtp = await otpRepo.findOne({
+      where: {
+        destination: destinations.length > 1 ? In(destinations) : destinations[0],
+        code: code,
+        isUsed: false,
+        expiresAt: MoreThan(new Date())
+      },
+      order: { createdAt: "DESC" }
+    });
+
+    if (!existingOtp) {
+      throw new Error("Invalid or expired OTP.");
+    }
+
+    const isSamePassword = await verifyPassword(newPassword, user.passwordHash);
+    if (isSamePassword) {
+      throw new Error("You cannot reuse your old password.");
+    }
+
+    const hashed = await hashPassword(newPassword);
+
+    user.passwordHash = hashed;
+    user.tokenVersion = (user.tokenVersion || 0) + 1;
+    await userRepo.save(user);
+
+    existingOtp.isUsed = true;
+    await otpRepo.save(existingOtp);
+  };
+
+  async logout(user: User): Promise<void> {
+    const userRepo = AppDataSource.getRepository(User);
+    user.tokenVersion += 1;
+    await userRepo.save(user);
+  }
 }

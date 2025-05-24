@@ -1,4 +1,3 @@
-
 import { Request, Response, NextFunction } from "express";
 import { verifyToken } from "../../utils/token";
 import AppDataSource from "../../data-source";
@@ -11,7 +10,7 @@ interface TokenPayload {
   tokenVersion: number;
 }
 
-export async function authMiddleware(req: Request, res: Response, next: NextFunction) {
+export async function adminAuthMiddleware(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return res.status(HttpStatus.UNAUTHORIZED).json(
@@ -22,13 +21,21 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
   const token = authHeader.split(" ")[1];
   try {
     const decoded = verifyToken(token) as TokenPayload;
-
     const userRepo = AppDataSource.getRepository(User);
-    const user = await userRepo.findOneBy({ id: decoded.userId });
+    const user = await userRepo.findOne({
+            where: { id: decoded.userId },
+            relations: { role: true, player: true }
+        });
 
     if (!user || user.tokenVersion !== decoded.tokenVersion || user.isDeleted) {
       return res.status(HttpStatus.UNAUTHORIZED).json(
         error("Session expired", HttpStatus.UNAUTHORIZED, true, HttpStatus.UNAUTHORIZED)
+      );
+    }
+
+    if (!user.role || user.role.name !== "admin") {
+      return res.status(HttpStatus.FORBIDDEN).json(
+        error("Admin access required", HttpStatus.FORBIDDEN)
       );
     }
 

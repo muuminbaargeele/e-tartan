@@ -37,6 +37,15 @@ export class User {
     @Column({ default: 0 })
     tokenVersion: number;
 
+    @Column({ default: false })
+    verifiedViaSms: boolean;
+
+    @Column({ default: false })
+    verifiedViaEmail: boolean;
+
+    @Column({ default: false })
+    forceVerifyViaEmail: boolean;
+
     @Column({ default: true })
     isActive!: boolean;
 
@@ -53,7 +62,9 @@ export class User {
     @UpdateDateColumn()
     updatedAt!: Date;
 
-    // Relation to Player (optional, only for players)
     @OneToOne(() => Player, player => player.user)
     player?: Player;
+
+    @Column({ default: false })
+    isDeleted: boolean;
 }

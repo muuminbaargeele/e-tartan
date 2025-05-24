@@ -9,7 +9,7 @@ export async function seedPlayer() {
   const playerRepo = AppDataSource.getRepository(Player);
   const roleRepo = AppDataSource.getRepository(Role);
 
-  const phone = "252611111111";
+  const phone = "252686821401";
 
   // Find the player role in Role table
   const playerRole = await roleRepo.findOneBy({ name: "player" });
@@ -37,7 +37,7 @@ export async function seedPlayer() {
     firstName: "Player",
     middleName: null,
     lastName: "One",
-    email: "player1@example.com",
+    email: "muuminbaargeele1@example.com",
     hasCompleteProfile: true
   });
   await userRepo.save(user);
@@ -47,6 +47,7 @@ export async function seedPlayer() {
     user: user,
     efootballId: "efb_001",
     efootballUsername: "PlayerOne",
+    efootballTeamName: "Demo FC",
     avatarUrl: null,
   });
   await playerRepo.save(player);

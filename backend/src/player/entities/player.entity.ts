@@ -21,8 +21,11 @@ export class Player {
   @Column({ unique: true })
   efootballId!: string;
 
-  @Column()
+  @Column({ unique: true })
   efootballUsername!: string;
+
+  @Column({ unique: true })
+  efootballTeamName!: string;
 
   @Column({ nullable: true })
   avatarUrl?: string;

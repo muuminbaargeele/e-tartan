@@ -59,4 +59,20 @@ router.post(
   }
 );
 
+router.delete(
+  "/delete",
+  authMiddleware as any,
+  async (req: Request, res: Response) => {
+    try {
+      const user = (req as any).user;
+      await userService.deleteAccount(user);
+      res.status(HttpStatus.OK).json(success({ message: "Account deleted successfully." }));
+      return;
+    } catch (err: any) {
+      res.status(HttpStatus.BAD_REQUEST).json(error(err.message, HttpStatus.BAD_REQUEST));
+      return;
+    }
+  }
+);
+
 export default router;

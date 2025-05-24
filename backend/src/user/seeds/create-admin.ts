@@ -25,14 +25,16 @@ export async function seedAdmin() {
   const passwordHash = await hashPassword("admin123");
   const admin = userRepo.create({
     username: "admin",
-    phoneNumber: "252610000000",
+    phoneNumber: "252612126698",
     passwordHash,
     isActive: true,
     role: adminRole,
     firstName: "Super",
     middleName: null,
     lastName: "Admin",
-    email: "admin@example.com"
+    email: "djkhaled7276@example.com",
+    verifiedViaEmail: true,
+    verifiedViaSms: true
   });
 
   await userRepo.save(admin);

@@ -5,6 +5,8 @@ import { seedMobileOperators } from "../user/seeds/create-mobile-operators";
 import { seedSysConfig } from "./sys-config";
 
 import AppDataSource from "../data-source";
+import { seedTournamentStatuses } from "../tournament/seeds/tournamentStatus.seed";
+import { seedTournamentTypes } from "../tournament/seeds/tournamentType.seed";
 
 async function runAllSeeds() {
     await AppDataSource.initialize();
@@ -28,6 +30,14 @@ async function runAllSeeds() {
     console.log("Seeding SysConfig...");
     await seedSysConfig();
     console.log("SysConfig seeded.");
+
+    console.log("Seeding TournamentStatuse...");
+    await seedTournamentStatuses();
+    console.log("TournamentStatuse seeded.");
+
+    console.log("Seeding TournamentTypes...");
+    await seedTournamentTypes();
+    console.log("TournamentTypes seeded.");
 
     // Add more as needed
     await AppDataSource.destroy();

@@ -1,4 +1,4 @@
-import { IsString, IsEmail, MinLength, Matches, Validate, IsOptional } from "class-validator";
+import { IsString, IsEmail, MinLength, Matches, Validate, IsOptional, Length } from "class-validator";
 import { IsActiveMobilePrefix } from "../../utils/activeMobilePrefix";
 
 export class CreateUserDto {
@@ -28,6 +28,7 @@ export class CreateUserDto {
 
   @IsString()
   @Matches(/^252\d{9}$/, { message: "Phone number must be in the format 252XXYYYYYYY" })
+  @Length(12, 12, { message: "Phone number must be exactly 12 digits" })
   @Validate(IsActiveMobilePrefix)
   phoneNumber: string;
 }
