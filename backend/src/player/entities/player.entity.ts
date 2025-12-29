@@ -12,27 +12,30 @@ import { User } from "../../user/entities/user.entity";
 @Entity("player")
 export class Player {
   @PrimaryGeneratedColumn("increment")
-  id!: number;
+  id: number;
 
   @OneToOne(() => User, { onDelete: "CASCADE" })
-  @JoinColumn()
+  @JoinColumn({ name: "userId" })
   user!: User;
 
-  @Column({ unique: true })
-  efootballId!: string;
+  @Column({ nullable: false })
+  userId!: number;
 
   @Column({ unique: true })
-  efootballUsername!: string;
+  efootballId: string;
 
   @Column({ unique: true })
-  efootballTeamName!: string;
+  efootballUsername: string;
+
+  @Column()
+  efootballTeamName: string;
 
   @Column({ nullable: true })
   avatarUrl?: string;
 
   @CreateDateColumn()
-  createdAt!: Date;
+  createdAt: Date;
 
   @UpdateDateColumn()
-  updatedAt!: Date;
+  updatedAt: Date;
 }

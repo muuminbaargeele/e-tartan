@@ -8,6 +8,17 @@ import { TournamentStatus } from "../entities/tournamentStatus.entity";
 import { TournamentParticipant } from "../entities/tournamentParticipant.entity";
 import { SubscriptionType } from "../../subscription/entities/subscriptionType.entity";
 import { PromoCode } from "../../promo/entities/promoCode.entity";
+import {
+    findTournamentOrThrow,
+    validateSubscriptionType,
+    assertRegistrationOpen,
+    assertNotAlreadyRegistered,
+    assertNotFull,
+    validatePromoCode,
+    calculateDiscount,
+    incrementPromoUsage,
+    calculateFinalPrice
+} from "../../utils/helpers";
 export class TournamentService {
 
     private tournamentRepo = AppDataSource.getRepository(Tournament);
@@ -121,90 +132,31 @@ export class TournamentService {
         promoCode?: string
     ) {
         // 1. Validate Tournament
-        const tournament = await this.tournamentRepo.findOne({
-            where: { id: tournamentId },
-            relations: { status: true }
-        });
-        if (!tournament) throw new Error("Tournament not found");
+        const tournament = await findTournamentOrThrow(this.tournamentRepo, tournamentId);
 
-        if (tournament.subscriptionTypeId && !subscriptionTypeId) {
-            throw new Error("This tournament requires a subscription type.");
-        }
+        // 2. Validate Subscription Type
+        validateSubscriptionType(tournament, subscriptionTypeId);
 
-        if (tournament.subscriptionTypeId && subscriptionTypeId !== tournament.subscriptionTypeId) {
-            throw new Error("Incorrect subscription type for this tournament.");
-        }
+        // 3. Registration Status
+        assertRegistrationOpen(tournament);
 
-        // 2. Only allow registration if status is open/upcoming
-        // Adjust IDs as needed for your statuses
-        const allowedStatusIds = [1]; // e.g., open and upcoming
-        if (!allowedStatusIds.includes(tournament.statusId)) {
-            throw new Error("Tournament is not open for registration");
-        }
+        // 4. Prevent duplicate registration
+        await assertNotAlreadyRegistered(this.tournamentParticipantRepo, tournamentId, playerId);
 
-        // 3. Prevent duplicate registration
-        const existing = await this.tournamentParticipantRepo.findOneBy({ tournamentId, playerId });
-        if (existing) throw new Error("Player already registered for this tournament");
+        // 5. Capacity check
+        await assertNotFull(this.tournamentParticipantRepo, tournament);
 
-        // 4. Capacity check
-        const count = await this.tournamentParticipantRepo.countBy({ tournamentId });
-        if (count >= tournament.maxPlayers) throw new Error("Tournament is already full");
-        console.log("player", playerId); // see what properties exist
-        // 5. Register participant
+        // 6. Promo code and pricing
         let discount = 0;
         let appliedPromo: PromoCode | undefined = undefined;
-
-        // Only process promo code if provided
         if (promoCode) {
-            const promoRepo = AppDataSource.getRepository(PromoCode);
-
-            // Find promo: global or specific to this tournament
-            const promo = await promoRepo.findOne({
-                where: [
-                    { code: promoCode, isActive: true, tournamentId: null },
-                    { code: promoCode, isActive: true, tournamentId: tournamentId }
-                ],
-                relations: { discountType: true },
-            });
-
-            if (!promo) {
-                throw new Error("Invalid or inactive promo code.");
-            }
-            // Check date validity
-            const now = new Date();
-            if (promo.validFrom && promo.validFrom > now) throw new Error("Promo code not yet active.");
-            if (promo.validTo && promo.validTo < now) throw new Error("Promo code expired.");
-
-            // Usage limit
-            if (promo.usageLimit !== null && promo.usageLimit !== undefined && promo.usedCount >= promo.usageLimit) {
-                throw new Error("Promo code usage limit reached.");
-            }
-
-            // Must match tournament if tournament-specific
-            if (promo.tournamentId && promo.tournamentId !== tournamentId) {
-                throw new Error("Promo code not valid for this tournament.");
-            }
-
-            // Calculate discount
-            if (promo.discountType.name === "amount") {
-                discount = Number(promo.value);
-            } else if (promo.discountType.name === "percentage") {
-                discount = Number(tournament.price) * Number(promo.value) / 100;
-            }
-
-            appliedPromo = promo;
+            appliedPromo = await validatePromoCode(promoCode, tournamentId);
+            discount = calculateDiscount(tournament.price, appliedPromo);
+            await incrementPromoUsage(appliedPromo);
         }
+        const finalPrice = calculateFinalPrice(tournament.price, discount);
 
-        // Final price never less than zero
-        const finalPrice = Math.max(0, Number(tournament.price) - discount);
-
-        // Optionally, increment promo code usage count (for tracking/limits)
-        if (appliedPromo) {
-            appliedPromo.usedCount = (appliedPromo.usedCount ?? 0) + 1;
-            await AppDataSource.getRepository(PromoCode).save(appliedPromo);
-        }
-
-        // ...then when creating the participant, store discount info
+        // 7. Register participant
         const participant = this.tournamentParticipantRepo.create({
             tournamentId,
             playerId,
@@ -218,6 +170,18 @@ export class TournamentService {
             finalPrice: finalPrice,
         });
         await this.tournamentParticipantRepo.save(participant);
+
+        // After saving the participant, check if tournament is now full
+        const participantsCount = await this.tournamentParticipantRepo.countBy({ tournamentId });
+        if (participantsCount >= tournament.maxPlayers) {
+            // Change status to REGISTRATION_CLOSED if max capacity reached
+            const registrationClosedStatus = await this.tournamentStatusRepo.findOneBy({ name: "REGISTRATION_CLOSED" });
+            if (registrationClosedStatus) {
+                tournament.status = registrationClosedStatus;
+                tournament.statusId = registrationClosedStatus.id;
+                await this.tournamentRepo.save(tournament);
+            }
+        }
 
         return {
             success: true,

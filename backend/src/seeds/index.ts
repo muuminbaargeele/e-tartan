@@ -9,6 +9,7 @@ import { seedTournamentStatuses } from "../tournament/seeds/tournamentStatus.see
 import { seedTournamentTypes } from "../tournament/seeds/tournamentType.seed";
 import { seedSubscriptionTypes } from "../subscription/seeds/create-subscription-types";
 import { seedPromo } from "../promo/seeds/seedPromo";
+import { seedMatchStatuses } from "../match/seeds/seedMatchStatus";
 
 async function runAllSeeds() {
     await AppDataSource.initialize();
@@ -48,6 +49,10 @@ async function runAllSeeds() {
     console.log("Seeding Promo...");
     await seedPromo();
     console.log("Promo seeded.");
+
+    console.log("Seeding MatchStatuses...");
+    await seedMatchStatuses();
+    console.log("MatchStatuses seeded.");
 
     // Add more as needed
     await AppDataSource.destroy();

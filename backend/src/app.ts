@@ -6,7 +6,9 @@ dotenv.config();
 
 import authRouter from "./auth/controllers/auth.controller";
 import userRouter from "./user/controllers/user.controller";
+import playerRouter from "./player/controllers/player.controller";
 import tournamentRouter from "./tournament/controllers/tournament.controller";
+// import "./cron/tournamentPairing.cron"; // This will register and start the cron job
 
 const app = express();
 
@@ -14,6 +16,7 @@ app.use(express.json());
 
 app.use("/auth", authRouter);
 app.use("/user", userRouter);
+app.use("/player", playerRouter);
 app.use("/tournament", tournamentRouter);
 
 app.get("/healthy", (req, res) => {

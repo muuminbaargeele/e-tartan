@@ -6,6 +6,7 @@ import { hashPassword } from "../../utils/password";
 import { CreateUserDto } from "../dtoes/createUser.dto";
 import { Role } from "../entities/role.entity";
 import { AuthService } from "../../auth/services/auth.service";
+import { domainToASCII } from "url";
 
 const authService = new AuthService();
 
@@ -54,6 +55,7 @@ export class UserService {
                 playerId: user.player.id,
                 efootballId: user.player.efootballId,
                 efootballUsername: user.player.efootballUsername,
+                efootballTeamName: user.player.efootballTeamName
             };
             profile.playerProfile = playerProfile;
         }

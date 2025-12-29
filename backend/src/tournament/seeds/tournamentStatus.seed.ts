@@ -6,10 +6,11 @@ export async function seedTournamentStatuses() {
 
   const statuses = [
     { name: "UPCOMING", description: "Tournament yet to start" },
+    { name: "OPEN", description: "Registration open" },
+    { name: "REGISTRATION_CLOSED", description: "Registration closed, waiting to start" },
     { name: "ONGOING", description: "Tournament currently running" },
     { name: "COMPLETED", description: "Tournament completed" },
-    { name: "CANCELLED", description: "Tournament cancelled" },
-    // Add more as needed
+    { name: "CANCELLED", description: "Tournament cancelled" }
   ];
 
   for (const status of statuses) {
