@@ -2,6 +2,15 @@ coreui-free-angular-admin-template/
 .cursor/
 backend/e-tartan-api.postman_collection.json
 backend/e-tartan-api.postman_environment.json
+md-files/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Dependencies
+node_modules/
 
 
 
