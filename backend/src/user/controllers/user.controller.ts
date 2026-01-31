@@ -10,7 +10,6 @@ import { ChangePasswordDto } from "../dtoes/changePassword.dto";
 import { UpdatePhoneNumberDto } from "../dtoes/updatePhoneNumber.dto";
 import { UpdateUsernameDto } from "../dtoes/updateUsername.dto";
 import { validateDto } from "../../utils/validateDto";
-import { SysConfig } from "../../utils/entities/sysconfig.entity";
 import AppDataSource from "../../data-source";
 import logger from "../../utils/logger";
 
@@ -78,10 +77,6 @@ router.post(
     try {
       const dto: CreateUserDto = (req as any).validatedBody;
       const { user, otpType } = await userService.createUser(dto);
-
-      const sysConfigRepo = AppDataSource.getRepository(SysConfig);
-      const smsOtp = await sysConfigRepo.findOneBy({ key: "isSmsOtpActive" });
-      const emailOtp = await sysConfigRepo.findOneBy({ key: "isEmailOtpActive" });
 
       logger.info({ userId: user.id, username: user.username, otpType }, "User created successfully");
       res.status(HttpStatus.OK).json(

@@ -5,7 +5,7 @@ import { signToken } from "../../utils/token";
 import { LoginRespDto } from "../dtoes/login.dto";
 import { Otp } from "../../user/entities/otp.entity";
 import { OtpType } from "../../utils/enums";
-import { SysConfig } from "../../utils/entities/sysconfig.entity";
+import { ConfigService } from "../../config/services/config.service";
 import { sendOtpEmail } from "../../utils/otp/sendEmailOtp";
 import { sendSmsOtp } from "../../utils/otp/sendSmsOtp";
 import { MoreThan, In } from "typeorm";
@@ -150,11 +150,13 @@ export class AuthService {
   }
 
   async sendOtp(user?: User, context: string = "default"): Promise<{ destination: string, otpType: string, code?: string }> {
-    const sysConfigRepo = AppDataSource.getRepository(SysConfig);
+    const configService = new ConfigService();
     const otpRepo = AppDataSource.getRepository(Otp);
 
-    const smsActive = await sysConfigRepo.findOneBy({ key: "isSmsOtpActive" });
-    const emailActive = await sysConfigRepo.findOneBy({ key: "isEmailOtpActive" });
+    // Get OTP config from the new config system
+    const otpConfig = await configService.get("otp_config");
+    const smsActive = otpConfig?.sms ?? false;
+    const emailActive = otpConfig?.email ?? true;
 
     const phoneNumber = user?.phoneNumber;
     const email = user?.email;
@@ -163,10 +165,10 @@ export class AuthService {
     let destination: string | undefined = undefined;
 
     if (context === "resetPassword" && user) {
-      if (user.verifiedViaEmail && emailActive?.value === "true" && email) {
+      if (user.verifiedViaEmail && emailActive && email) {
         otpType = OtpType.EMAIL;
         destination = email;
-      } else if (!user.verifiedViaEmail && user.verifiedViaSms && smsActive?.value === "true" && phoneNumber) {
+      } else if (!user.verifiedViaEmail && user.verifiedViaSms && smsActive && phoneNumber) {
         otpType = OtpType.SMS;
         destination = phoneNumber;
         user.forceVerifyViaEmail = true;
@@ -175,10 +177,10 @@ export class AuthService {
         throw new Error("No verified channel for password reset.");
       }
     } else {
-      if (smsActive?.value === "true" && phoneNumber) {
+      if (smsActive && phoneNumber) {
         otpType = OtpType.SMS;
         destination = phoneNumber;
-      } else if (emailActive?.value === "true" && email) {
+      } else if (emailActive && email) {
         otpType = OtpType.EMAIL;
         destination = email;
       } else {
@@ -206,7 +208,7 @@ export class AuthService {
       } catch (err: any) {
         logger.error({ err: err?.response?.data || err?.message || err, destination }, "Failed to send OTP SMS");
 
-        if (emailActive?.value === "true" && email) {
+        if (emailActive && email) {
           try {
             await sendOtpEmail(email, code, user);
             otp.destination = email;

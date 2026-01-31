@@ -27,8 +27,8 @@ export class ConfigService {
                 allowedTimeDifferenceMinutes: 120 // 2 hours
             },
             otp_config: {
-                isSmsOtpActive: false,
-                isEmailOtpActive: true,
+                sms: false,
+                email: true,
                 otpExpirationMinutes: 10,
                 maxOtpAttempts: 3
             },

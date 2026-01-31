@@ -230,12 +230,13 @@ export class UserService {
     async requestPhoneUpdateOtp(newPhoneNumber: string): Promise<{ destination: string, otpType: string, code?: string }> {
         const otpRepo = AppDataSource.getRepository(Otp);
         const { sendSmsOtp } = require("../../utils/otp/sendSmsOtp");
-        const SysConfig = require("../../utils/entities/sysconfig.entity").SysConfig;
-        const sysConfigRepo = AppDataSource.getRepository(SysConfig);
+        const { ConfigService } = require("../../config/services/config.service");
+        const configService = new ConfigService();
 
-        // Check if SMS OTP is active
-        const smsActive = await sysConfigRepo.findOneBy({ key: "isSmsOtpActive" });
-        if (smsActive?.value !== "true") {
+        // Check if SMS OTP is active from config
+        const otpConfig = await configService.get("otp_config");
+        const smsActive = otpConfig?.sms ?? false;
+        if (!smsActive) {
             throw new Error("SMS OTP is not active");
         }
 
