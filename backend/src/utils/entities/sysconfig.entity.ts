@@ -8,6 +8,6 @@ export class SysConfig {
   @Column({ unique: true })
   key: string;
 
-  @Column()
-  value: string;
+  @Column("json")
+  value: any;
 }
