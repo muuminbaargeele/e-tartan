@@ -11,13 +11,9 @@ import authRouter from "./auth/controllers/auth.controller";
 import userRouter from "./user/controllers/user.controller";
 import playerRouter from "./player/controllers/player.controller";
 import tournamentRouter from "./tournament/controllers/tournament.controller";
-import matchRouter from "./match/controllers/match.controller";
 import configRouter from "./config/controllers/config.controller";
 
 import { ConfigService } from "./config/services/config.service";
-import { MatchCronService } from "./cron/matchCron.service";
-import { WhatsappService } from "./bot/services/whatsapp.service";
-// import "./cron/tournamentPairing.cron"; // This will register and start the cron job
 
 const app = express();
 
@@ -70,7 +66,6 @@ app.use("/auth", authRouter);
 app.use("/user", userRouter);
 app.use("/player", playerRouter);
 app.use("/tournament", tournamentRouter);
-app.use("/match", matchRouter);
 app.use("/config", configRouter);
 
 app.get("/healthy", (req, res) => {
@@ -89,19 +84,6 @@ AppDataSource.initialize()
     const configService = new ConfigService();
     await configService.initializeDefaults();
     logger.info("Config initialized");
-
-    // Initialize Cron
-    const cronService = new MatchCronService();
-    cronService.init();
-    logger.info("Cron initialized");
-
-    // Initialize WhatsApp Bot
-    // Check config if enabled? Default true for now or load from config
-    const whatsappEnabled = (await configService.get("bot_config"))?.whatsappEnabled ?? true;
-    if (whatsappEnabled) {
-      new WhatsappService();
-      logger.info("WhatsApp Bot starting...");
-    }
 
     app.listen(PORT, () => {
       logger.info({ port: PORT }, `🚀 Server running on port ${PORT}`);
