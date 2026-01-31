@@ -5,7 +5,7 @@
 ## Features
 
 - 🏆 **League & Cup Management:** Players join leagues or knockout cups, view fixtures, and report match results.
-- 🤖 **AI Result Extraction:** Use AI (ChatGPT) to process and validate match results from screenshots or text.
+- 🤖 **AI Result Extraction:** Supports both OCR (Tesseract.js) and OpenAI (ChatGPT) for processing and validating match results from screenshots or text. The system can be configured to use either method via system configuration.
 - 🛡️ **Secure eFootball Profiles:** Each user has a profile linked to their eFootball account.
 - 💸 **Subscription System:** Supports weekly/monthly subscriptions.
 - 🎟️ **Promo Codes:** Users can redeem promo codes for free or discounted subscriptions.
@@ -14,9 +14,13 @@
 
 ## Tech Stack
 
-- **Frontend:** Flutter (planned for Android & iOS)
 - **Backend:** Node.js, Express, TypeORM, MySQL
-- **AI Integration:** ChatGPT/OpenAI API for match result processing
+- **AI Integration:** 
+  - **OCR:** Tesseract.js for optical character recognition from match screenshots
+  - **OpenAI:** ChatGPT/OpenAI API for intelligent match result extraction and validation
+  - **Configuration:** System can be configured to use either OCR or OpenAI via `ocr_config` settings
+
+**Note:** Player and Admin frontends are not implemented. The project currently provides a RESTful API backend only. Use Postman or any API client to interact with the endpoints.
 
 ## How It Works
 
@@ -34,7 +38,6 @@
 - [x] User management module (Profile management, Password change, Phone/Username update)
 - [x] Player management module (eFootball profile creation and management)
 - [x] Configuration management module (System settings, Tournament rules, Match rules)
-- [ ] Flutter mobile app (in progress)
 - [ ] AI result integration (in progress)
 - [ ] Full league/tournament engine
 
