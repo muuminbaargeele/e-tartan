@@ -2,6 +2,8 @@ import { Player } from "../entities/player.entity";
 import AppDataSource from "../../data-source";
 import { User } from "../../user/entities/user.entity";
 import { CreatePlayerProfileDto } from "../dtoes/createPlayerProfile.dto";
+import { PlayerProfileDto } from "../dtoes/playerProfile.dto";
+import logger from "../../utils/logger";
 
 export class PlayerService {
     async createPlayerProfile(user: User, dto: CreatePlayerProfileDto): Promise<Player> {
@@ -31,8 +33,7 @@ export class PlayerService {
             throw new Error("eFootball Username is already used by another player.");
         }
 
-        console.log("User object:", user);      // Should have id
-        console.log("User ID:", user.id);       // Should be a number, not null
+        logger.debug({ userId: user.id }, "Creating player profile");
         // 5. Create player profile
         const player = playerRepo.create({
             user: user,
@@ -49,5 +50,31 @@ export class PlayerService {
         await userRepo.save(user);
 
         return player;
+    }
+
+    async getPlayerProfile(user: User): Promise<PlayerProfileDto> {
+        const playerRepo = AppDataSource.getRepository(Player);
+
+        // Get player profile with user relation
+        const player = await playerRepo.findOne({
+            where: { userId: user.id },
+            relations: { user: true }
+        });
+
+        if (!player) {
+            throw new Error("Player profile not found. Please create your player profile first.");
+        }
+
+        // Verify user is a player
+        if (!user.role || user.role.name !== "player") {
+            throw new Error("Only players can access player profile.");
+        }
+
+        return {
+            playerId: player.id,
+            efootballId: player.efootballId,
+            efootballUsername: player.efootballUsername,
+            efootballTeamName: player.efootballTeamName
+        };
     }
 }

@@ -9,6 +9,7 @@ import { SysConfig } from "../../utils/entities/sysconfig.entity";
 import { sendOtpEmail } from "../../utils/otp/sendEmailOtp";
 import { sendSmsOtp } from "../../utils/otp/sendSmsOtp";
 import { MoreThan, In } from "typeorm";
+import logger from "../../utils/logger";
 
 export class AuthService {
   private userRepo = AppDataSource.getRepository(User);
@@ -16,6 +17,36 @@ export class AuthService {
   async login(username: string, password: string): Promise<LoginRespDto | null> {
     const user = await this.userRepo.findOneBy({ username });
     if (!user || user.isDeleted) return null;
+    const isValid = await verifyPassword(password, user.passwordHash);
+    if (!isValid) return null;
+
+    user.tokenVersion = (user.tokenVersion || 0) + 1;
+    await this.userRepo.save(user);
+
+    const token = signToken({
+      userId: user.id,
+      tokenVersion: user.tokenVersion,
+    });
+
+    return { authToken: token };
+  };
+
+  /**
+   * Admin-only login - restricts login to users with admin role
+   */
+  async adminLogin(username: string, password: string): Promise<LoginRespDto | null> {
+    const user = await this.userRepo.findOne({
+      where: { username },
+      relations: { role: true }
+    });
+    
+    if (!user || user.isDeleted) return null;
+    
+    // Check if user has admin role
+    if (!user.role || user.role.name !== "admin") {
+      return null; // Return null instead of throwing to maintain same error handling pattern
+    }
+    
     const isValid = await verifyPassword(password, user.passwordHash);
     if (!isValid) return null;
 
@@ -49,7 +80,73 @@ export class AuthService {
 
     otp.isUsed = true;
     await otpRepo.save(otp);
+
+    // Update user verification status based on OTP type
+    if (otp.type === OtpType.SMS && otp.destination === user.phoneNumber) {
+      user.verifiedViaSms = true;
+    } else if (otp.type === OtpType.EMAIL && otp.destination === user.email) {
+      user.verifiedViaEmail = true;
+    }
+    await this.userRepo.save(user);
+
     return true;
+  }
+
+  /**
+   * Public OTP verification for registration (doesn't require authentication)
+   * Accepts phoneNumber or email + OTP code
+   */
+  async verifyOtpPublic(phoneNumber?: string, email?: string, code?: string): Promise<{ verified: boolean; user?: User }> {
+    if (!code || (!phoneNumber && !email)) {
+      return { verified: false };
+    }
+
+    const otpRepo = AppDataSource.getRepository(Otp);
+    const destination = phoneNumber || email;
+
+    if (!destination) {
+      return { verified: false };
+    }
+
+    // Find the most recent unused OTP matching the code and destination
+    const otp = await otpRepo.findOne({
+      where: {
+        code,
+        destination,
+        isUsed: false,
+        expiresAt: MoreThan(new Date())
+      },
+      order: { createdAt: "DESC" }
+    });
+
+    if (!otp) {
+      return { verified: false };
+    }
+
+    // Find user by phoneNumber or email
+    const user = await this.userRepo.findOne({
+      where: phoneNumber 
+        ? { phoneNumber } 
+        : { email }
+    });
+
+    if (!user) {
+      return { verified: false };
+    }
+
+    // Mark OTP as used
+    otp.isUsed = true;
+    await otpRepo.save(otp);
+
+    // Update user verification status based on OTP type
+    if (otp.type === OtpType.SMS && phoneNumber) {
+      user.verifiedViaSms = true;
+    } else if (otp.type === OtpType.EMAIL && email) {
+      user.verifiedViaEmail = true;
+    }
+    await this.userRepo.save(user);
+
+    return { verified: true, user };
   }
 
   async sendOtp(user?: User, context: string = "default"): Promise<{ destination: string, otpType: string, code?: string }> {
@@ -97,6 +194,7 @@ export class AuthService {
       type: otpType,
       isUsed: false,
       expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes expiry
+      user: user, // Link OTP to user for easier lookup
     });
     await otpRepo.save(otp);
 
@@ -104,8 +202,9 @@ export class AuthService {
       try {
         const smsNumber = destination.startsWith("252") ? destination.substring(3) : destination;
         await sendSmsOtp(smsNumber, code);
-      } catch (err) {
-        console.error("Failed to send OTP SMS:", err?.response?.data || err?.message || err);
+        logger.info({ destination, type: "SMS" }, "OTP sent via SMS");
+      } catch (err: any) {
+        logger.error({ err: err?.response?.data || err?.message || err, destination }, "Failed to send OTP SMS");
 
         if (emailActive?.value === "true" && email) {
           try {
