@@ -12,6 +12,7 @@ import userRouter from "./user/controllers/user.controller";
 import playerRouter from "./player/controllers/player.controller";
 import tournamentRouter from "./tournament/controllers/tournament.controller";
 import configRouter from "./config/controllers/config.controller";
+import matchRouter from "./match/match.routes";
 
 import { ConfigService } from "./config/services/config.service";
 
@@ -67,6 +68,7 @@ app.use("/user", userRouter);
 app.use("/player", playerRouter);
 app.use("/tournament", tournamentRouter);
 app.use("/config", configRouter);
+app.use("/match", matchRouter);
 
 app.get("/healthy", (req, res) => {
   res.json({ status: "ok", message: "Server is healthy!" });

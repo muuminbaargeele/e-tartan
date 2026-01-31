@@ -8,6 +8,8 @@ import { TournamentStatus } from "../entities/tournamentStatus.entity";
 import { TournamentParticipant } from "../entities/tournamentParticipant.entity";
 import { SubscriptionType } from "../../subscription/entities/subscriptionType.entity";
 import { PromoCode } from "../../promo/entities/promoCode.entity";
+import { Match } from "../../match/entities/match.entity";
+import { MatchStatus } from "../../match/entities/matchStatus.entity";
 import {
     findTournamentOrThrow,
     validateSubscriptionType,
@@ -224,6 +226,142 @@ export class TournamentService {
     async isPlayerRegisteredForTournament(tournamentId: number, playerId: number): Promise<boolean> {
         const participant = await this.tournamentParticipantRepo.findOneBy({ tournamentId, playerId });
         return !!participant;
+    }
+
+    async startTournament(tournamentId: number): Promise<Tournament> {
+        // Use transaction for safety
+        return await AppDataSource.transaction(async (transactionalEntityManager) => {
+            const tournamentRepo = transactionalEntityManager.getRepository(Tournament);
+            const tournamentStatusRepo = transactionalEntityManager.getRepository(TournamentStatus);
+            const tournamentParticipantRepo = transactionalEntityManager.getRepository(TournamentParticipant);
+            const matchRepo = transactionalEntityManager.getRepository(Match);
+            const matchStatusRepo = transactionalEntityManager.getRepository(MatchStatus);
+
+            // 1. Fetch tournament with status relation
+            const tournament = await tournamentRepo.findOne({
+                where: { id: tournamentId },
+                relations: { status: true }
+            });
+
+            if (!tournament) {
+                throw new Error("Tournament not found");
+            }
+
+            // 2. Validate tournament status is "OPEN" or "REGISTRATION_CLOSED"
+            const allowedStatuses = ["OPEN", "REGISTRATION_CLOSED"];
+            if (!tournament.status || !allowedStatuses.includes(tournament.status.name)) {
+                throw new Error(`Tournament cannot be started. Current status: ${tournament.status?.name || "unknown"}`);
+            }
+
+            // 3. Check if tournament already has round 1 matches (idempotency)
+            const existingMatches = await matchRepo.find({
+                where: {
+                    tournamentId,
+                    round: 1
+                }
+            });
+
+            if (existingMatches.length > 0) {
+                // Tournament already started, return it
+                return await tournamentRepo.findOne({
+                    where: { id: tournamentId },
+                    relations: { status: true, type: true }
+                }) as Tournament;
+            }
+
+            // 4. Validate at least 2 participants
+            const participantCount = await tournamentParticipantRepo.count({
+                where: { tournamentId, isEliminated: false }
+            });
+
+            if (participantCount < 2) {
+                throw new Error("Tournament must have at least 2 participants to start");
+            }
+
+            // 5. Set tournament status to "ONGOING"
+            const ongoingStatus = await tournamentStatusRepo.findOneBy({ name: "ONGOING" });
+            if (!ongoingStatus) {
+                throw new Error("Tournament status 'ONGOING' not found");
+            }
+
+            tournament.statusId = ongoingStatus.id;
+            tournament.status = ongoingStatus;
+            await tournamentRepo.save(tournament);
+
+            // 6. Fetch all participants
+            const participants = await tournamentParticipantRepo.find({
+                where: { tournamentId, isEliminated: false },
+                relations: { player: true }
+            });
+
+            // 7. Shuffle participants randomly
+            function shuffle<T>(array: T[]): T[] {
+                let currentIndex = array.length, randomIndex;
+                while (currentIndex !== 0) {
+                    randomIndex = Math.floor(Math.random() * currentIndex);
+                    currentIndex--;
+                    [array[currentIndex], array[randomIndex]] = [
+                        array[randomIndex], array[currentIndex]
+                    ];
+                }
+                return array;
+            }
+            const shuffled = shuffle([...participants]);
+
+            // 8. Get match statuses
+            const scheduledStatus = await matchStatusRepo.findOneBy({ name: "scheduled" });
+            const byeStatus = await matchStatusRepo.findOneBy({ name: "bye" });
+            if (!scheduledStatus || !byeStatus) {
+                throw new Error("Match statuses not seeded");
+            }
+
+            // 9. Generate round 1 matches
+            const matches: Match[] = [];
+            const scheduledAt = tournament.startDate;
+
+            for (let i = 0; i < shuffled.length; i += 2) {
+                const p1 = shuffled[i];
+                const p2 = shuffled[i + 1];
+
+                if (!p2) {
+                    // Odd number of participants - give bye to last player
+                    matches.push(matchRepo.create({
+                        tournamentId,
+                        round: 1,
+                        player1Id: p1.playerId,
+                        player2Id: null,
+                        scheduledAt,
+                        statusId: byeStatus.id,
+                        winnerId: p1.playerId, // Bye means player1 wins automatically
+                        playedAt: new Date() // Bye is considered played immediately
+                    }));
+                } else {
+                    matches.push(matchRepo.create({
+                        tournamentId,
+                        round: 1,
+                        player1Id: p1.playerId,
+                        player2Id: p2.playerId,
+                        scheduledAt,
+                        statusId: scheduledStatus.id
+                    }));
+                }
+            }
+
+            // 10. Save all matches
+            await matchRepo.save(matches);
+
+            // 11. Reload tournament with relations
+            const updatedTournament = await tournamentRepo.findOne({
+                where: { id: tournamentId },
+                relations: { status: true, type: true }
+            });
+
+            if (!updatedTournament) {
+                throw new Error("Failed to reload tournament after start");
+            }
+
+            return updatedTournament;
+        });
     }
 
 }

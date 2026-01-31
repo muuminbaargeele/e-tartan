@@ -66,6 +66,19 @@ export class Match {
   @Column({ nullable: true })
   chatId?: number;
 
+  @Column({ nullable: true })
+  player1Score?: number;
+
+  @Column({ nullable: true })
+  player2Score?: number;
+
+  @ManyToOne(() => Player, { nullable: true })
+  @JoinColumn({ name: "winnerId" })
+  winner?: Player;
+
+  @Column({ nullable: true })
+  winnerId?: number;
+
   @CreateDateColumn()
   createdAt: Date;
 

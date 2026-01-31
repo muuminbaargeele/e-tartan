@@ -108,6 +108,30 @@ router.delete(
 );
 
 router.post(
+  "/:id/start",
+  adminAuthMiddleware as any,
+  async (req: Request, res: Response) => {
+    try {
+      const id = Number(req.params.id);
+      if (isNaN(id)) {
+        res.status(HttpStatus.BAD_REQUEST).json(error("Invalid tournament ID", HttpStatus.BAD_REQUEST));
+        return;
+      }
+      const tournament = await tournamentService.startTournament(id);
+      res.status(HttpStatus.OK).json(success({ 
+        message: "Tournament started successfully.",
+        tournament 
+      }));
+    } catch (err: any) {
+      const statusCode = err.message?.includes("not found") 
+        ? HttpStatus.NOT_FOUND 
+        : HttpStatus.BAD_REQUEST;
+      res.status(statusCode).json(error(err.message || "Server error", statusCode));
+    }
+  }
+);
+
+router.post(
   "/:id/register",
   playerAuthMiddleware as any,
   async (req: Request, res: Response) => {

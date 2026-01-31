@@ -3,6 +3,7 @@ import { User } from "../../user/entities/user.entity";
 import { TournamentStatus } from "./tournamentStatus.entity";
 import { TournamentType } from "./tournamentType.entity";
 import { SubscriptionType } from "../../subscription/entities/subscriptionType.entity";
+import { Player } from "../../player/entities/player.entity";
 
 @Entity()
 export class Tournament {
@@ -60,5 +61,15 @@ export class Tournament {
 
   @Column({ nullable: true })
   subscriptionTypeId?: number;
+
+  @ManyToOne(() => Player, { nullable: true })
+  @JoinColumn({ name: "winnerId" })
+  winner?: Player;
+
+  @Column({ nullable: true })
+  winnerId?: number;
+
+  @Column({ type: "boolean", default: false, nullable: true })
+  isPrivate?: boolean;
 
 }
